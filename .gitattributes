@@ -1,0 +1,3 @@
+# 保证 shell 脚本与 Makefile 在 Linux/WSL 下可执行（避免 Windows 打包成 CRLF）
+*.sh text eol=lf
+Makefile text eol=lf
