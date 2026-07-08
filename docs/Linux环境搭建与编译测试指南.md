@@ -275,6 +275,8 @@ myshell 在非交互模式（管道/脚本输入）下会自动使用 `getline` 
 ./myshell < test_commands.txt
 ```
 
+脚本中 `run_shell()` 会为每次用例创建**临时独立 HOME**，并将 myshell 的 **stdout 与 stderr 合并捕获**（`2>&1`），因此 `waitpid: No child processes` 等内部错误也会使对应用例失败，而不会「表面 PASS、实际有报错」。
+
 Tab 补全、上下键历史等**交互功能**无法自动化，需在第 8 节手动测试。
 
 ---
@@ -521,18 +523,19 @@ chmod +x myshell
 
 项目路径请尽量使用**英文目录名**（如 `~/myshell`、`D:\study\shell`），避免中文或特殊字符，以免 WSL / 终端编码异常。
 
-### Q5：`make test` 有 `[FAIL]`
+### Q5：`make test` 有 `[FAIL]` 或终端出现 `waitpid: No child processes`
 
 1. 查看失败项名称和实际输出
 2. 确认在 Linux 环境运行（不是 Windows PowerShell）
 3. 确认 `/etc/passwd` 存在（A5/A10/A12 依赖此文件）
-4. 将完整终端输出保存，便于排查
+4. 若 stderr 出现 `waitpid: No child processes`，说明 Shell 中 **SIGCHLD 处理与 waitpid 冲突**（例如误用 `signal(SIGCHLD, SIG_IGN)` 同时又 wait 前台子进程）；请使用最新版 `executor.c`（`executor_setup_signals()` + wait 期间屏蔽 SIGCHLD）
+5. 将完整终端输出保存，便于排查
 
 > 测试脚本会为每次用例创建**临时独立 HOME**，不会读写你真实的 `~/.myshell_history`，可放心反复运行。
 
-### Q5b：`scripts/run_tests.sh: command not found` 或 `$'\r': command not found`
+### Q5b：`scripts/run_tests.sh: command not found`、`$'\r': command not found` 或 `syntax error near unexpected token '('`
 
-脚本被保存为 Windows 换行（CRLF）时会出现。在 WSL 中执行：
+**CRLF 换行（Windows 保存）：** 在 WSL 中执行：
 
 ```bash
 sed -i 's/\r$//' scripts/run_tests.sh
@@ -540,7 +543,7 @@ chmod +x scripts/run_tests.sh
 make test
 ```
 
-使用 Git 克隆的项目一般无此问题（仓库已配置 `.gitattributes` 保持 LF）。
+**语法错误（含括号）：** 确认使用 `bash scripts/run_tests.sh`（不要用 `sh`）；并检查脚本是否为最新版（T5 引号闭合、T13 skip 分支不含未加引号的括号）。使用 Git 克隆的项目一般无此问题（仓库已配置 `.gitattributes` 保持 LF）。
 
 ### Q6：`make` 成功但功能异常
 

@@ -24,7 +24,7 @@ fail=0
 run_shell() {
     local test_home
     test_home="$(mktemp -d)"
-    HOME="$test_home" "$MYSHELL" < "$1"
+    HOME="$test_home" "$MYSHELL" < "$1" 2>&1
     rm -rf "$test_home"
 }
 
@@ -54,7 +54,7 @@ assert_file_eq() {
     else
         echo "[FAIL] $desc"
         echo "  expected file: $expected"
-        echo "  got: $(cat "$file" 2>/dev/null || echo '(missing)')"
+        echo "  got: $(cat "$file" 2>/dev/null || echo 'missing')"
         fail=$((fail + 1))
     fi
 }
@@ -107,7 +107,7 @@ cat > "$SCRIPT" <<'EOF'
 grep root /etc/passwd | wc -l
 exit
 EOF
-OUT="$(run_shell "$SCRIPT" | tr -d ' \n')
+OUT="$(run_shell "$SCRIPT" | tr -d ' \n')"
 if [[ "$OUT" =~ ^[0-9]+$ ]] && [[ "$OUT" -ge 1 ]]; then
     echo "[PASS] pipe"
     pass=$((pass + 1))
@@ -202,7 +202,7 @@ OUT="$(run_shell "$SCRIPT")"
 if [[ -x /bin/ls ]]; then
     assert_contains "ls external" "$OUT" "/bin/ls"
 else
-    echo "[PASS] ls external (skipped: /bin/ls missing)"
+    echo "[PASS] ls external - skipped, /bin/ls missing"
     pass=$((pass + 1))
 fi
 

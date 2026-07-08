@@ -1,22 +1,17 @@
 #include "alias.h"
 #include "completion.h"
+#include "executor.h"
 #include "history.h"
 #include "input.h"
 #include "parser.h"
 #include "shell.h"
 
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 History g_history;
-
-static void setup_signals(void)
-{
-    signal(SIGCHLD, SIG_IGN);
-}
 
 static void trim_inplace(char *s)
 {
@@ -59,7 +54,7 @@ static int process_command(const char *line)
 
 int main(void)
 {
-    setup_signals();
+    executor_setup_signals();
     history_init(&g_history);
     history_load(&g_history);
     history_sync_readline(&g_history);

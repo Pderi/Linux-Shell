@@ -11,7 +11,26 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static int wait_pid_retry(pid_t pid, int *status)
+static void sigchld_handler(int sig)
+{
+    (void)sig;
+    int saved_errno = errno;
+    while (waitpid(-1, NULL, WNOHANG) > 0)
+        ;
+    errno = saved_errno;
+}
+
+void executor_setup_signals(void)
+{
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sigchld_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGCHLD, &sa, NULL);
+}
+
+static int wait_pid_blocking(pid_t pid, int *status)
 {
     for (;;) {
         pid_t rc = waitpid(pid, status, 0);
@@ -23,6 +42,19 @@ static int wait_pid_retry(pid_t pid, int *status)
             continue;
         return -1;
     }
+}
+
+static int wait_pid_retry(pid_t pid, int *status)
+{
+    sigset_t mask, oldmask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    if (sigprocmask(SIG_BLOCK, &mask, &oldmask) < 0)
+        return -1;
+
+    int rc = wait_pid_blocking(pid, status);
+    sigprocmask(SIG_SETMASK, &oldmask, NULL);
+    return rc;
 }
 
 static void reset_child_signals(void)
@@ -103,11 +135,16 @@ static void run_command_child(Command *cmd)
 
 static int wait_pids(pid_t *pids, int n)
 {
-    int rc = 0;
+    sigset_t mask, oldmask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    if (sigprocmask(SIG_BLOCK, &mask, &oldmask) < 0)
+        return 1;
 
+    int rc = 0;
     for (int i = 0; i < n; i++) {
         int status = 0;
-        if (wait_pid_retry(pids[i], &status) < 0)
+        if (wait_pid_blocking(pids[i], &status) < 0)
             continue;
         if (i != n - 1)
             continue;
@@ -116,15 +153,25 @@ static int wait_pids(pid_t *pids, int n)
         else
             rc = 1;
     }
+
+    sigprocmask(SIG_SETMASK, &oldmask, NULL);
     return rc;
 }
 
 static void kill_pids(pid_t *pids, int n)
 {
+    sigset_t mask, oldmask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    if (sigprocmask(SIG_BLOCK, &mask, &oldmask) < 0)
+        return;
+
     for (int i = 0; i < n; i++)
         kill(pids[i], SIGTERM);
     for (int i = 0; i < n; i++)
-        wait_pid_retry(pids[i], NULL);
+        wait_pid_blocking(pids[i], NULL);
+
+    sigprocmask(SIG_SETMASK, &oldmask, NULL);
 }
 
 static int run_pipeline_children(Pipeline *pl, int pipes[][2])
