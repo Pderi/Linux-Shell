@@ -16,7 +16,7 @@ sudo apt install build-essential libreadline-dev
 
 ```bash
 make          # 编译
-make test     # 自动化功能测试（需 Linux/WSL，15 项场景 / 18 条断言）
+make test     # 自动化功能测试（需 Linux/WSL，15 项场景 / 22 条断言）
 ./myshell     # 交互运行
 ```
 

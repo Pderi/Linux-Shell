@@ -63,10 +63,12 @@ assert_file_eq() {
 SCRIPT="$TMP/t1.txt"
 cat > "$SCRIPT" <<'EOF'
 echo hello world
+echo "hello quoted world"
 exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
 assert_contains "echo hello world" "$OUT" "hello world"
+assert_contains "echo quoted arg" "$OUT" "hello quoted world"
 
 # T2: type cd / type ls
 SCRIPT="$TMP/t2.txt"
@@ -131,11 +133,29 @@ SCRIPT="$TMP/t7.txt"
 cat > "$SCRIPT" <<'EOF'
 alias hi='echo alias_ok'
 hi
+alias dir='echo spaced_ok'
+dir
+alias ll="echo dq_ok"
+ll
+alias lr='ls -l'
+lr
 unalias hi
+unalias dir
+unalias ll
+unalias lr
 exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
 assert_contains "alias expand" "$OUT" "alias_ok"
+assert_contains "alias quoted space value" "$OUT" "spaced_ok"
+assert_contains "alias double quoted value" "$OUT" "dq_ok"
+if echo "$OUT" | grep -Fq "invalid format"; then
+    echo "[FAIL] alias ls -l style"
+    fail=$((fail + 1))
+else
+    echo "[PASS] alias ls -l style"
+    pass=$((pass + 1))
+fi
 
 # T8: history
 SCRIPT="$TMP/t8.txt"

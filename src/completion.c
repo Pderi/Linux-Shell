@@ -97,12 +97,27 @@ static char *command_generator(const char *text, int state)
     return strdup(match_list[match_index++]);
 }
 
+static int completing_command_name(int start)
+{
+    if (!rl_line_buffer || start < 0)
+        return 0;
+
+    int i = start - 1;
+    while (i >= 0 && (rl_line_buffer[i] == ' ' || rl_line_buffer[i] == '\t'))
+        i--;
+
+    if (i < 0)
+        return 1;
+
+    return rl_line_buffer[i] == '|';
+}
+
 static char **myshell_completion(const char *text, int start, int end)
 {
     (void)end;
     rl_attempted_completion_over = 0;
 
-    if (start == 0) {
+    if (completing_command_name(start)) {
         rl_attempted_completion_over = 1;
         return rl_completion_matches(text, command_generator);
     }

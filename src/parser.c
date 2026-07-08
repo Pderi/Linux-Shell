@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_TOKEN 1024
+
 static char *skip_space(char *p)
 {
     while (*p && isspace((unsigned char)*p))
@@ -51,56 +53,49 @@ static void strip_background_flag(char *p, Pipeline *pl)
         p[--len] = '\0';
 }
 
-static char *dup_token(const char *start, size_t len)
-{
-    char *s = malloc(len + 1);
-    if (!s)
-        return NULL;
-    memcpy(s, start, len);
-    s[len] = '\0';
-    return s;
-}
-
-static int add_arg(Command *cmd, const char *start, size_t len)
-{
-    if (cmd->argc >= MAX_ARGS - 1)
-        return -1;
-    char *arg = dup_token(start, len);
-    if (!arg)
-        return -1;
-    cmd->argv[cmd->argc++] = arg;
-    cmd->argv[cmd->argc] = NULL;
-    return 0;
-}
-
-static int read_redirect_path(char **pp, char **dest)
+static int read_next_arg(char **pp, char **out)
 {
     char *p = skip_space(*pp);
     if (!*p)
         return -1;
 
-    char *start;
-    size_t len;
+    char buf[MAX_TOKEN];
+    size_t len = 0;
 
-    if (*p == '"' || *p == '\'') {
-        char quote = *p++;
-        start = p;
-        while (*p && *p != quote)
+    while (*p) {
+        if (*p == '<' || *p == '>' || *p == '|')
+            break;
+        if (*p == '"' || *p == '\'') {
+            char q = *p++;
+            while (*p && *p != q) {
+                if (len + 1 >= sizeof(buf))
+                    return -1;
+                buf[len++] = *p++;
+            }
+            if (*p != q)
+                return -1;
             p++;
-        if (*p != quote)
+            continue;
+        }
+        if (isspace((unsigned char)*p))
+            break;
+        if (len + 1 >= sizeof(buf))
             return -1;
-        len = (size_t)(p - start);
-        p++;
-    } else {
-        start = p;
-        while (*p && !isspace((unsigned char)*p) && *p != '|')
-            p++;
-        len = (size_t)(p - start);
+        buf[len++] = *p++;
     }
 
-    *dest = dup_token(start, len);
+    if (len == 0)
+        return -1;
+
+    buf[len] = '\0';
+    *out = strdup(buf);
     *pp = p;
-    return *dest ? 0 : -1;
+    return *out ? 0 : -1;
+}
+
+static int read_redirect_path(char **pp, char **dest)
+{
+    return read_next_arg(pp, dest);
 }
 
 static int parse_segment(char *seg, Command *cmd)
@@ -138,27 +133,17 @@ static int parse_segment(char *seg, Command *cmd)
             continue;
         }
 
-        char quote = 0;
-        if (*p == '"' || *p == '\'') {
-            quote = *p++;
-            char *start = p;
-            while (*p && *p != quote)
-                p++;
-            if (*p != quote)
-                return -1;
-            if (add_arg(cmd, start, (size_t)(p - start)) < 0)
-                return -1;
-            p++;
-            continue;
+        char *arg = NULL;
+        if (read_next_arg(&p, &arg) < 0) {
+            free(arg);
+            return -1;
         }
-
-        char *start = p;
-        while (*p && !isspace((unsigned char)*p) && *p != '<' && *p != '>' && *p != '|')
-            p++;
-        if (p == start)
+        if (cmd->argc >= MAX_ARGS - 1) {
+            free(arg);
             return -1;
-        if (add_arg(cmd, start, (size_t)(p - start)) < 0)
-            return -1;
+        }
+        cmd->argv[cmd->argc++] = arg;
+        cmd->argv[cmd->argc] = NULL;
     }
 
     return cmd->argc > 0 ? 0 : -1;

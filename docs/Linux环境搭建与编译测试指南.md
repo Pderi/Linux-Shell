@@ -241,11 +241,11 @@ bash scripts/run_tests.sh
 
 ```
 ==============================
-Results: 18 passed, 0 failed
+Results: 22 passed, 0 failed
 ==============================
 ```
 
-> 脚本含 15 个测试场景、18 条断言（type 测 2 条、history 测 2 条、T15 测 2 条），**`0 failed` 即表示全部通过**。
+> 脚本含 15 个测试场景、22 条断言（type 测 2 条、history 测 2 条、alias 测 4 条、T15 测 2 条等），**`0 failed` 即表示全部通过**。
 
 ### 6.3 自动化测试覆盖项
 
