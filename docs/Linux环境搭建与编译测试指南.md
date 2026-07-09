@@ -1,5 +1,13 @@
 # Linux 环境搭建与编译测试指南
 
+> **版本变更（2026-07-09，相较 exec 外部命令版）**
+>
+> - 环境说明：明确 ls/cat/grep 为**内建实现**，不 exec 外部程序
+> - 自动化测试 A5：由 `grep | wc -l` 改为 `grep | grep`（纯内建管道）
+> - 自动化测试 A14/A15：由 `sleep &` 改为 `grep &` / `ls &`
+> - 新增 A16：验证非内建命令（如 `wc`）报 `command not found`
+> - 手动测试 T6：`type ls` 预期改为 `ls is a shell builtin`
+
 > 适用项目：myshell（操作系统课程设计 · 实验一）  
 > 开发模式：Windows + Cursor 编辑代码，WSL2 / Linux 编译运行
 
@@ -33,7 +41,7 @@
 
 **为什么必须在 Linux 上编译？**
 
-myshell 使用 `fork`、`exec`、`pipe`、`chdir` 等 Linux 系统调用，只能在 Linux 环境下编译和运行，Windows 原生无法直接运行。
+myshell 使用 `fork`、`pipe`、`open`、`chdir` 等 Linux 系统调用，只能在 Linux 环境下编译和运行，Windows 原生无法直接运行。实验命令（ls/cat/grep 等）均为**内建实现**，不 exec 外部程序。
 
 **项目放在哪里都可以**：解压压缩包、Git 克隆、U 盘拷贝均可，只要进入**含 `Makefile` 的项目根目录**即可编译测试。
 
@@ -255,17 +263,18 @@ Results: 22 passed, 0 failed
 | A2 | `type cd` / `type ls` | type |
 | A3 | `cd /tmp` + `pwd` | cd |
 | A4 | `>` / `>>` 重定向 | 重定向 |
-| A5 | `grep ... \| wc -l` | 管道 |
-| A6 | `echo hello \| grep hello` | 管道 + 内置 echo |
-| A7 | `alias` 创建与展开 | alias |
+| A5 | `grep ... \| grep root` | 管道（纯内建） |
+| A6 | `echo hello \| grep hello` | 管道 + 内建 echo |
+| A7 | `alias` 创建与展开（含 `alias lr='ls -l'`） | alias |
 | A8 | `history 3` | history |
 | A9 | `echo $HOME` | echo 环境变量 |
-| A10 | `grep root /etc/passwd` | grep 外部命令 |
+| A10 | `grep root /etc/passwd` | grep 内建 |
 | A11 | 引号路径 `> "q out.txt"` | 重定向（含空格路径） |
-| A12 | `cat /etc/passwd` | cat 外部命令 |
-| A13 | `ls /bin/ls` | ls 外部命令 |
-| A14 | `sleep 0.1 &` | 后台运行 |
+| A12 | `cat /etc/passwd` | cat 内建 |
+| A13 | `ls /bin/ls` | ls 内建 |
+| A14 | `grep root /etc/passwd &` | 后台运行 |
 | A15 | 引号内 `&` + 尾部空格 `&` | 后台标志解析 |
+| A16 | `wc -l /etc/passwd` | 非内建命令拒绝（command not found） |
 
 ### 6.4 原理说明
 
@@ -327,7 +336,7 @@ exit
 | T3 | `grep root /etc/passwd` | 显示含 root 的行 | ☐ |
 | T4 | `echo hello world` | 输出 `hello world` | ☐ |
 | T5 | `type cd` | 输出 `cd is a shell builtin` | ☐ |
-| T6 | `type ls` | 输出 `ls is /usr/bin/ls`（路径可能不同） | ☐ |
+| T6 | `type ls` | 输出 `ls is a shell builtin` | ☐ |
 
 ### 8.2 内置命令 cd
 
@@ -379,7 +388,7 @@ cat /tmp/out.txt
 
 | 编号 | 操作 | 预期结果 | 通过 |
 |------|------|----------|------|
-| T22 | 输入 `ca` 后按 **Tab** | 补全为 `cat` | ☐ |
+| T22 | 输入 `hi` 后按 **Tab** | 补全为 `history` | ☐ |
 | T23 | 输入 `ls /et` 后按 **Tab** | 补全路径（如 `/etc/`） | ☐ |
 | T24 | 输入前缀后按 **两次 Tab** | 列出所有匹配候选 | ☐ |
 

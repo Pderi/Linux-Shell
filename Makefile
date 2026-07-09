@@ -6,6 +6,9 @@ SRCS = src/main.c \
        src/parser.c \
        src/executor.c \
        src/builtins.c \
+       src/builtin_ls.c \
+       src/builtin_cat.c \
+       src/builtin_grep.c \
        src/history.c \
        src/alias.c \
        src/input.c \

@@ -158,16 +158,34 @@ int builtin_alias(Command *cmd)
         return 0;
     }
 
-    for (int i = 1; i < cmd->argc; i++) {
+    for (int i = 1; i < cmd->argc; ) {
+        char combined[1024];
         char name[256], value[1024];
-        if (parse_alias_assignment(cmd->argv[i], name, sizeof(name), value, sizeof(value)) < 0) {
-            fprintf(stderr, "alias: invalid format: %s\n", cmd->argv[i]);
+        int j = i;
+
+        snprintf(combined, sizeof(combined), "%s", cmd->argv[j]);
+        while (parse_alias_assignment(combined, name, sizeof(name), value,
+                                     sizeof(value)) < 0 &&
+               j + 1 < cmd->argc) {
+            size_t len = strlen(combined);
+            if (len + 1 >= sizeof(combined))
+                break;
+            combined[len] = ' ';
+            combined[len + 1] = '\0';
+            strncat(combined, cmd->argv[j + 1], sizeof(combined) - len - 2);
+            j++;
+        }
+
+        if (parse_alias_assignment(combined, name, sizeof(name), value,
+                                   sizeof(value)) < 0) {
+            fprintf(stderr, "alias: invalid format: %s\n", combined);
             return 1;
         }
         if (alias_set(name, value) < 0) {
             fprintf(stderr, "alias: out of memory\n");
             return 1;
         }
+        i = j + 1;
     }
     return 0;
 }

@@ -1,11 +1,9 @@
 #include "completion.h"
 #include "type.h"
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <readline/readline.h>
 
@@ -57,32 +55,6 @@ static void build_command_matches(const char *text)
         if (strncmp(builtins[i], text, strlen(text)) == 0)
             add_match(builtins[i]);
     }
-
-    const char *pathenv = getenv("PATH");
-    if (!pathenv)
-        return;
-
-    char *pathcopy = strdup(pathenv);
-    if (!pathcopy)
-        return;
-
-    char *save = NULL;
-    for (char *dir = strtok_r(pathcopy, ":", &save); dir; dir = strtok_r(NULL, ":", &save)) {
-        DIR *d = opendir(dir);
-        if (!d)
-            continue;
-        struct dirent *ent;
-        while ((ent = readdir(d))) {
-            if (strncmp(ent->d_name, text, strlen(text)) != 0)
-                continue;
-            char full[1024];
-            snprintf(full, sizeof(full), "%s/%s", dir, ent->d_name);
-            if (access(full, X_OK) == 0)
-                add_match(ent->d_name);
-        }
-        closedir(d);
-    }
-    free(pathcopy);
 }
 
 static char *command_generator(const char *text, int state)
@@ -115,12 +87,9 @@ static int completing_command_name(int start)
 static char **myshell_completion(const char *text, int start, int end)
 {
     (void)end;
-    rl_attempted_completion_over = 0;
 
-    if (completing_command_name(start)) {
-        rl_attempted_completion_over = 1;
+    if (completing_command_name(start))
         return rl_completion_matches(text, command_generator);
-    }
 
     return rl_completion_matches(text, rl_filename_completion_function);
 }

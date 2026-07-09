@@ -20,7 +20,6 @@ trap 'rm -rf "$TMP"' EXIT
 pass=0
 fail=0
 
-# 每次测试使用独立 HOME，避免 ~/.myshell_history 或前序测试污染 history 等用例
 run_shell() {
     local test_home
     test_home="$(mktemp -d)"
@@ -41,6 +40,20 @@ assert_contains() {
         echo "  got:"
         echo "$haystack" | sed 's/^/    /'
         fail=$((fail + 1))
+    fi
+}
+
+assert_not_contains() {
+    local desc="$1"
+    local haystack="$2"
+    local needle="$3"
+    if echo "$haystack" | grep -Fq "$needle"; then
+        echo "[FAIL] $desc"
+        echo "  unexpected: $needle"
+        fail=$((fail + 1))
+    else
+        echo "[PASS] $desc"
+        pass=$((pass + 1))
     fi
 }
 
@@ -69,6 +82,7 @@ EOF
 OUT="$(run_shell "$SCRIPT")"
 assert_contains "echo hello world" "$OUT" "hello world"
 assert_contains "echo quoted arg" "$OUT" "hello quoted world"
+assert_not_contains "echo no waitpid error" "$OUT" "waitpid: No child processes"
 
 # T2: type cd / type ls
 SCRIPT="$TMP/t2.txt"
@@ -79,9 +93,9 @@ exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
 assert_contains "type cd" "$OUT" "cd is a shell builtin"
-assert_contains "type ls" "$OUT" "ls is"
+assert_contains "type ls" "$OUT" "ls is a shell builtin"
 
-# T3: cd
+# T3: cd + pwd
 SCRIPT="$TMP/t3.txt"
 cat > "$SCRIPT" <<'EOF'
 cd /tmp
@@ -100,24 +114,18 @@ echo second >> "$OUTFILE"
 cat < "$OUTFILE"
 exit
 EOF
-run_shell "$SCRIPT" >/dev/null
+OUT="$(run_shell "$SCRIPT")"
+assert_not_contains "redirect no waitpid error" "$OUT" "waitpid: No child processes"
 assert_file_eq "redirect > and >>" "$OUTFILE" $'first\nsecond'
 
-# T5: pipe
+# T5: pipe (builtins only)
 SCRIPT="$TMP/t5.txt"
 cat > "$SCRIPT" <<'EOF'
-grep root /etc/passwd | wc -l
+grep root /etc/passwd | grep root
 exit
 EOF
-OUT="$(run_shell "$SCRIPT" | tr -d ' \n')"
-if [[ "$OUT" =~ ^[0-9]+$ ]] && [[ "$OUT" -ge 1 ]]; then
-    echo "[PASS] pipe"
-    pass=$((pass + 1))
-else
-    echo "[FAIL] pipe"
-    echo "  got: $OUT"
-    fail=$((fail + 1))
-fi
+OUT="$(run_shell "$SCRIPT")"
+assert_contains "pipe builtins" "$OUT" "root"
 
 # T6: builtin echo in pipe
 SCRIPT="$TMP/t6.txt"
@@ -184,14 +192,14 @@ else
     fail=$((fail + 1))
 fi
 
-# T10: external grep
+# T10: builtin grep
 SCRIPT="$TMP/t10.txt"
 cat > "$SCRIPT" <<'EOF'
 grep root /etc/passwd
 exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
-assert_contains "grep external" "$OUT" "root"
+assert_contains "grep builtin" "$OUT" "root"
 
 # T11: quoted redirect path (path with space)
 QOUT="$TMP/q out.txt"
@@ -203,33 +211,33 @@ SCRIPT="$TMP/t11.txt"
 run_shell "$SCRIPT" >/dev/null
 assert_file_eq "quoted redirect path" "$QOUT" "quoted"
 
-# T12: cat external
+# T12: builtin cat
 SCRIPT="$TMP/t12.txt"
 cat > "$SCRIPT" <<'EOF'
 cat /etc/passwd
 exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
-assert_contains "cat external" "$OUT" "root"
+assert_contains "cat builtin" "$OUT" "root"
 
-# T13: ls external
+# T13: builtin ls
 SCRIPT="$TMP/t13.txt"
 cat > "$SCRIPT" <<'EOF'
 ls /bin/ls
 exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
-if [[ -x /bin/ls ]]; then
-    assert_contains "ls external" "$OUT" "/bin/ls"
+if [[ -e /bin/ls ]]; then
+    assert_contains "ls builtin" "$OUT" "/bin/ls"
 else
-    echo "[PASS] ls external - skipped, /bin/ls missing"
+    echo "[PASS] ls builtin - skipped, /bin/ls missing"
     pass=$((pass + 1))
 fi
 
 # T14: background
 SCRIPT="$TMP/t14.txt"
 cat > "$SCRIPT" <<'EOF'
-sleep 0.1 &
+grep root /etc/passwd &
 exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
@@ -239,12 +247,21 @@ assert_contains "background &" "$OUT" "running in background"
 SCRIPT="$TMP/t15.txt"
 cat > "$SCRIPT" <<'EOF'
 echo "a&b"
-sleep 0.1 &   
+grep root /etc/passwd &
 exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
 assert_contains "quoted ampersand" "$OUT" "a&b"
 assert_contains "background trailing space" "$OUT" "running in background"
+
+# T16: unknown command rejected (no exec)
+SCRIPT="$TMP/t16.txt"
+cat > "$SCRIPT" <<'EOF'
+wc -l /etc/passwd
+exit
+EOF
+OUT="$(run_shell "$SCRIPT")"
+assert_contains "reject external command" "$OUT" "wc: command not found"
 
 echo ""
 echo "=============================="

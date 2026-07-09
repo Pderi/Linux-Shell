@@ -109,6 +109,20 @@ static int builtin_echo(Command *cmd)
     return 0;
 }
 
+int builtin_pwd(Command *cmd)
+{
+    char cwd[4096];
+
+    (void)cmd;
+    if (!getcwd(cwd, sizeof(cwd))) {
+        perror("pwd");
+        return 1;
+    }
+    puts(cwd);
+    fflush(stdout);
+    return 0;
+}
+
 int run_builtin(Command *cmd)
 {
     if (!cmd->argv[0])
@@ -121,6 +135,14 @@ int run_builtin(Command *cmd)
         rc = builtin_cd(cmd);
     else if (strcmp(name, "echo") == 0)
         rc = builtin_echo(cmd);
+    else if (strcmp(name, "pwd") == 0)
+        rc = builtin_pwd(cmd);
+    else if (strcmp(name, "ls") == 0)
+        rc = builtin_ls(cmd);
+    else if (strcmp(name, "cat") == 0)
+        rc = builtin_cat(cmd);
+    else if (strcmp(name, "grep") == 0)
+        rc = builtin_grep(cmd);
     else if (strcmp(name, "type") == 0)
         rc = builtin_type(cmd);
     else if (strcmp(name, "history") == 0)

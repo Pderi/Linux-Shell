@@ -1,5 +1,10 @@
 # myshell
 
+> **版本变更（2026-07-09，相较 exec 外部命令版）**
+>
+> - 支持功能：`ls` / `cat` / `grep` / `pwd` 改为**内建命令**（系统调用实现）
+> - 删除「外部命令 fork + exec」描述；不再调用 `/bin/ls` 等系统命令
+
 操作系统课程设计实验一：简易 Linux Shell。
 
 ## 依赖
@@ -32,8 +37,7 @@ sudo apt install build-essential libreadline-dev
 
 ## 支持功能
 
-- 外部命令：`ls`、`cat`、`grep` 等（fork + exec）
-- 内置命令：`cd`、`echo`、`type`、`history`、`alias`、`unalias`、`exit`
+- 内建命令：`cd`、`echo`、`pwd`、`ls`、`cat`、`grep`、`type`、`history`、`alias`、`unalias`、`exit`（系统调用实现，不 exec 外部程序）
 - 管道：`|`
 - 重定向：`>`、`>>`、`<`
 - 后台运行：`&`

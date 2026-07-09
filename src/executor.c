@@ -36,6 +36,8 @@ static int wait_pid_blocking(pid_t pid, int *status)
         pid_t rc = waitpid(pid, status, 0);
         if (rc > 0)
             return 0;
+        if (rc < 0 && errno == ECHILD)
+            return 0;
         if (rc == 0)
             return -1;
         if (errno == EINTR)
@@ -99,6 +101,36 @@ int executor_setup_redirection(const Command *cmd)
     return 0;
 }
 
+static int run_builtin_in_parent(Command *cmd)
+{
+    int saved_in = -1;
+    int saved_out = -1;
+    int rc;
+
+    if (cmd->in_file)
+        saved_in = dup(STDIN_FILENO);
+    if (cmd->out_file)
+        saved_out = dup(STDOUT_FILENO);
+
+    if ((cmd->in_file || cmd->out_file) && executor_setup_redirection(cmd) < 0) {
+        rc = 1;
+        goto restore;
+    }
+
+    rc = run_builtin(cmd);
+
+restore:
+    if (saved_in >= 0) {
+        dup2(saved_in, STDIN_FILENO);
+        close(saved_in);
+    }
+    if (saved_out >= 0) {
+        dup2(saved_out, STDOUT_FILENO);
+        close(saved_out);
+    }
+    return rc;
+}
+
 static void close_pipe_fds(int pipes[][2], int n)
 {
     for (int i = 0; i < n; i++) {
@@ -128,7 +160,6 @@ static void run_command_child(Command *cmd)
         _exit(rc);
     }
 
-    execvp(cmd->argv[0], cmd->argv);
     fprintf(stderr, "myshell: %s: command not found\n", cmd->argv[0]);
     _exit(127);
 }
@@ -205,6 +236,14 @@ static int run_pipeline_children(Pipeline *pl, int pipes[][2])
 
 static int execute_single(Command *cmd, int background)
 {
+    if (!is_builtin(cmd->argv[0])) {
+        fprintf(stderr, "myshell: %s: command not found\n", cmd->argv[0]);
+        return 127;
+    }
+
+    if (!background && !cmd->in_file && !cmd->out_file)
+        return run_builtin(cmd);
+
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork");
@@ -220,7 +259,7 @@ static int execute_single(Command *cmd, int background)
         return 0;
     }
 
-    int status;
+    int status = 0;
     if (wait_pid_retry(pid, &status) < 0) {
         perror("waitpid");
         return 1;
@@ -236,7 +275,10 @@ int executor_run_single_builtin(Command *cmd, int background)
     if (strcmp(cmd->argv[0], "exit") == 0)
         return run_builtin(cmd);
 
-    if (!cmd->in_file && !cmd->out_file && !background)
+    if (!background && (cmd->in_file || cmd->out_file))
+        return run_builtin_in_parent(cmd);
+
+    if (!background && !cmd->in_file && !cmd->out_file)
         return run_builtin(cmd);
 
     pid_t pid = fork();
@@ -260,7 +302,7 @@ int executor_run_single_builtin(Command *cmd, int background)
         return 0;
     }
 
-    int status;
+    int status = 0;
     if (wait_pid_retry(pid, &status) < 0) {
         perror("waitpid");
         return 1;
@@ -272,6 +314,17 @@ int execute_pipeline(Pipeline *pl)
 {
     if (!pl || pl->count <= 0)
         return 1;
+
+    for (int i = 0; i < pl->count; i++) {
+        if (!pl->cmds[i].argv[0]) {
+            fprintf(stderr, "myshell: empty command in pipeline\n");
+            return 1;
+        }
+        if (!is_builtin(pl->cmds[i].argv[0])) {
+            fprintf(stderr, "myshell: %s: command not found\n", pl->cmds[i].argv[0]);
+            return 127;
+        }
+    }
 
     if (pl->count == 1)
         return execute_single(&pl->cmds[0], pl->background);
