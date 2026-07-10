@@ -37,7 +37,7 @@ sudo apt install build-essential libreadline-dev
 
 ## 支持功能
 
-- 内建命令：`cd`、`echo`、`pwd`、`ls`、`cat`、`grep`、`type`、`history`、`alias`、`unalias`、`exit`（系统调用实现，不 exec 外部程序）
+- 内建命令：`cd`、`echo`、`pwd`、`sleep`、`ls`、`cat`、`grep`、`type`、`history`、`alias`、`unalias`、`exit`（系统调用实现，不 exec 外部程序）
 - 管道：`|`
 - 重定向：`>`、`>>`、`<`
 - 后台运行：`&`

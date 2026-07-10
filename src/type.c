@@ -4,7 +4,7 @@
 #include <string.h>
 
 static const char *builtin_table[] = {
-    "cd", "echo", "pwd", "ls", "cat", "grep",
+    "cd", "echo", "pwd", "sleep", "ls", "cat", "grep",
     "type", "history", "alias", "unalias", "exit", NULL
 };
 

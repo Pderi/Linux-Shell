@@ -147,6 +147,7 @@ alias ll="echo dq_ok"
 ll
 alias lr='ls -l'
 lr
+alias
 unalias hi
 unalias dir
 unalias ll
@@ -157,6 +158,7 @@ OUT="$(run_shell "$SCRIPT")"
 assert_contains "alias expand" "$OUT" "alias_ok"
 assert_contains "alias quoted space value" "$OUT" "spaced_ok"
 assert_contains "alias double quoted value" "$OUT" "dq_ok"
+assert_contains "alias list all" "$OUT" "alias hi='echo alias_ok'"
 if echo "$OUT" | grep -Fq "invalid format"; then
     echo "[FAIL] alias ls -l style"
     fail=$((fail + 1))
@@ -262,6 +264,38 @@ exit
 EOF
 OUT="$(run_shell "$SCRIPT")"
 assert_contains "reject external command" "$OUT" "wc: command not found"
+
+# T17: sleep builtin
+SCRIPT="$TMP/t17.txt"
+cat > "$SCRIPT" <<'EOF'
+sleep 0
+exit
+EOF
+OUT="$(run_shell "$SCRIPT")"
+assert_not_contains "sleep no error" "$OUT" "error"
+assert_not_contains "sleep no command not found" "$OUT" "command not found"
+
+# T18: type sleep (verify sleep is builtin)
+SCRIPT="$TMP/t18.txt"
+cat > "$SCRIPT" <<'EOF'
+type sleep
+exit
+EOF
+OUT="$(run_shell "$SCRIPT")"
+assert_contains "type sleep builtin" "$OUT" "sleep is a shell builtin"
+
+# T19: unalias removes alias
+SCRIPT="$TMP/t19.txt"
+cat > "$SCRIPT" <<'EOF'
+alias temp='echo temp_ok'
+temp
+unalias temp
+temp
+exit
+EOF
+OUT="$(run_shell "$SCRIPT")"
+assert_contains "alias temp works" "$OUT" "temp_ok"
+assert_contains "unalias removes alias" "$OUT" "temp: command not found"
 
 echo ""
 echo "=============================="

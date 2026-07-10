@@ -97,4 +97,8 @@ static char **myshell_completion(const char *text, int start, int end)
 void completion_init(void)
 {
     rl_attempted_completion_function = myshell_completion;
+    rl_attempted_completion_over = 0;
+    rl_basic_word_break_characters = " \t\n$><=;|&(";
+    rl_completer_quote_characters = "\"'";
+    rl_completion_append_character = ' ';
 }

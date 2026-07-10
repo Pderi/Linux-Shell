@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static int strcase_contains(const char *hay, const char *needle)
 {
@@ -73,8 +74,15 @@ int builtin_grep(Command *cmd)
         first_arg = 3;
     }
 
-    if (first_arg >= cmd->argc)
-        return grep_stream(stdin, pattern, ignore_case, 0, NULL);
+    if (first_arg >= cmd->argc) {
+        FILE *fp = fdopen(STDIN_FILENO, "r");
+        if (!fp) {
+            fprintf(stderr, "grep: cannot read stdin\n");
+            return 1;
+        }
+        int rc = grep_stream(fp, pattern, ignore_case, 0, NULL);
+        return rc;
+    }
 
     int rc = 1;
     int multi = cmd->argc - first_arg > 1;

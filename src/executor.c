@@ -36,8 +36,11 @@ static int wait_pid_blocking(pid_t pid, int *status)
         pid_t rc = waitpid(pid, status, 0);
         if (rc > 0)
             return 0;
-        if (rc < 0 && errno == ECHILD)
+        if (rc < 0 && errno == ECHILD) {
+            if (status)
+                *status = 0;
             return 0;
+        }
         if (rc == 0)
             return -1;
         if (errno == EINTR)
@@ -118,6 +121,8 @@ static int run_builtin_in_parent(Command *cmd)
     }
 
     rc = run_builtin(cmd);
+    fflush(stdout);
+    fflush(stderr);
 
 restore:
     if (saved_in >= 0) {

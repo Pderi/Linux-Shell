@@ -5,9 +5,11 @@
 #include "type.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 static void expand_env_print(const char *arg)
@@ -123,6 +125,33 @@ int builtin_pwd(Command *cmd)
     return 0;
 }
 
+static int builtin_sleep(Command *cmd)
+{
+    if (cmd->argc < 2) {
+        fprintf(stderr, "sleep: missing operand\n");
+        return 1;
+    }
+
+    char *endptr;
+    double secs = strtod(cmd->argv[1], &endptr);
+    if (endptr == cmd->argv[1] || secs < 0) {
+        fprintf(stderr, "sleep: invalid time interval '%s'\n", cmd->argv[1]);
+        return 1;
+    }
+
+    struct timespec ts;
+    ts.tv_sec = (time_t)secs;
+    ts.tv_nsec = (long)((secs - (double)ts.tv_sec) * 1000000000L);
+
+    while (nanosleep(&ts, &ts) == -1) {
+        if (errno == EINTR)
+            continue;
+        perror("sleep");
+        return 1;
+    }
+    return 0;
+}
+
 int run_builtin(Command *cmd)
 {
     if (!cmd->argv[0])
@@ -137,6 +166,8 @@ int run_builtin(Command *cmd)
         rc = builtin_echo(cmd);
     else if (strcmp(name, "pwd") == 0)
         rc = builtin_pwd(cmd);
+    else if (strcmp(name, "sleep") == 0)
+        rc = builtin_sleep(cmd);
     else if (strcmp(name, "ls") == 0)
         rc = builtin_ls(cmd);
     else if (strcmp(name, "cat") == 0)
